@@ -1,0 +1,15 @@
+C4Context
+  title FIAP X - Diagrama de Contexto (Fase 5)
+
+  Person(usuario, "Usuario", "Envia videos, acompanha o processamento e baixa os frames extraidos.")
+  Person(admin, "Administrador", "Consulta videos de qualquer usuario.")
+
+  System(fiapx, "FIAP X", "Plataforma de processamento assincrono de videos: autenticacao, upload, extracao de frames e download em ZIP.")
+
+  System_Ext(smtp, "Servidor SMTP", "Recebe os e-mails de falha de processamento. Em desenvolvimento: MailHog.")
+  System_Ext(obs, "Observabilidade", "Prometheus, Grafana e Zipkin para metricas, dashboards e tracing distribuido.")
+
+  Rel(usuario, fiapx, "Cadastra-se, autentica, envia e baixa videos", "HTTPS / JSON / multipart")
+  Rel(admin, fiapx, "Consulta videos de qualquer usuario", "HTTPS / JSON")
+  Rel(fiapx, smtp, "Notifica falhas de processamento", "SMTP")
+  Rel(fiapx, obs, "Exporta metricas, traces e logs", "HTTP / OTLP")

@@ -1,0 +1,25 @@
+C4Component
+  title auth-service - Diagrama de Componentes
+
+  Container_Boundary(auth, "auth-service") {
+    Component(controller, "AuthController", "Spring MVC", "Expõe /api/auth/register, /login e /me.")
+    Component(security, "SecurityConfig + JwtAuthenticationFilter", "Spring Security", "Protege /me e valida o token Bearer.")
+    Component(jwt, "JwtService", "JJWT", "Emite e valida JWT HS256 com issuer fiapx-auth.")
+    Component(app, "AuthApplicationServiceImpl", "Application Service", "Orquestra cadastro, login e consulta de usuario.")
+    Component(domain, "Usuario", "Domain", "Regras de criacao, normalizacao de e-mail e status ativo.")
+    Component(repo, "UsuarioRepository", "Spring Data JPA", "Persistencia de usuarios.")
+    Component(handler, "GlobalExceptionHandler", "Spring MVC", "Traduz excecoes para respostas de erro padronizadas.")
+  }
+
+  ContainerDb(db, "PostgreSQL", "fiapx_auth", "Tabela usuario.")
+  Container(video, "video-service", "Spring Boot", "Valida o JWT emitido pelo auth-service.")
+
+  Rel(controller, app, "Chama casos de uso")
+  Rel(controller, security, "Passa pelo filtro")
+  Rel(security, jwt, "Valida token")
+  Rel(app, domain, "Cria e consulta")
+  Rel(app, jwt, "Gera token no login")
+  Rel(app, repo, "Persiste e busca")
+  Rel(repo, db, "JDBC")
+  Rel(handler, controller, "Intercepta erros")
+  Rel(jwt, video, "Segredo HS256 compartilhado", "Configuracao")

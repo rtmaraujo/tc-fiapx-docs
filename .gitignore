@@ -1,0 +1,19 @@
+# Cada servico e um repositorio Git independente.
+tc-fiapx-auth-service/
+tc-fiapx-video-service/
+tc-fiapx-processing-service/
+
+# Artefatos locais
+target/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+*.log
+.env
+
+# Lixo de pacote macOS
+__MACOSX/
+
+# Pacote original recebido (o conteudo esta em legacy/projeto-fiapx)
+projeto-fiapx.zip

@@ -1,0 +1,39 @@
+C4Container
+  title FIAP X - Diagrama de Conteineres (Fase 5)
+
+  Person(usuario, "Usuario", "Consome a API REST.")
+
+  System_Boundary(fiapx, "FIAP X") {
+    Container(auth, "auth-service", "Java 21 / Spring Boot 4", "Cadastro, login, emissao e validacao de JWT. Porta 8081.")
+    Container(video, "video-service", "Java 21 / Spring Boot 4", "Upload, status, download, outbox transacional e notificacao por e-mail. Porta 8082.")
+    Container(processing, "processing-service", "Java 21 / Spring Boot 4 + FFmpeg", "Consome pedidos, extrai 1 frame/s, gera ZIP e publica resultado. Porta 8083.")
+
+    ContainerDb(postgres, "PostgreSQL", "Um cluster, tres bancos isolados", "fiapx_auth, fiapx_video e fiapx_processing.")
+    ContainerQueue(kafka, "Apache Kafka (KRaft)", "Mensageria", "Topicos fiapx.video.solicitado, .processado e .falha, com retry e DLT.")
+    ContainerDb(s3, "SeaweedFS", "Object storage compativel com S3 (cliente MinIO SDK)", "Videos originais e ZIPs de frames.")
+    Container(mail, "MailHog", "SMTP de desenvolvimento", "Caixa de entrada usada nos testes locais.")
+
+    Container(prometheus, "Prometheus", "Coleta de metricas", "Scrape dos endpoints /actuator/prometheus.")
+    Container(grafana, "Grafana", "Dashboards", "Visualizacao de latencia, erros, lag e JVM.")
+    Container(zipkin, "Zipkin", "Tracing distribuido", "Correlacao de requisicoes entre servicos.")
+  }
+
+  Rel(usuario, auth, "Cadastro e login", "HTTPS / JSON")
+  Rel(usuario, video, "Upload, consulta e download", "HTTPS / multipart / JSON")
+  Rel(auth, postgres, "Le e grava usuarios", "JDBC")
+  Rel(video, postgres, "Grava videos, outbox e notificacoes", "JDBC")
+  Rel(processing, postgres, "Grava processamentos e idempotencia", "JDBC")
+  Rel(video, kafka, "Publica VideoSolicitado", "Kafka")
+  Rel(kafka, processing, "Entrega VideoSolicitado", "Kafka")
+  Rel(processing, kafka, "Publica VideoProcessado / VideoFalha", "Kafka")
+  Rel(kafka, video, "Entrega VideoProcessado / VideoFalha", "Kafka")
+  Rel(video, s3, "Salva video original e le ZIP", "S3 API")
+  Rel(processing, s3, "Baixa video e salva ZIP", "S3 API")
+  Rel(video, mail, "Envia e-mail de falha", "SMTP")
+  Rel(prometheus, auth, "Scrape de metricas", "HTTP")
+  Rel(prometheus, video, "Scrape de metricas", "HTTP")
+  Rel(prometheus, processing, "Scrape de metricas", "HTTP")
+  Rel(grafana, prometheus, "Consulta series temporais", "HTTP")
+  Rel(auth, zipkin, "Envia spans", "HTTP")
+  Rel(video, zipkin, "Envia spans", "HTTP")
+  Rel(processing, zipkin, "Envia spans", "HTTP")

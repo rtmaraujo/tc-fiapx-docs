@@ -1,0 +1,135 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (application, uri) (rate(http_server_requests_seconds_count{application=~\"tc-fiapx-.*\"}[5m]))",
+          "legendFormat": "{{application}} {{uri}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Requisicoes HTTP por segundo",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (application, le) (rate(http_server_requests_seconds_bucket{application=~\"tc-fiapx-.*\"}[5m])))",
+          "legendFormat": "p95 {{application}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Latencia HTTP p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (application, status) (increase(http_server_requests_seconds_count{application=~\"tc-fiapx-.*\", status=~\"4..|5..\"}[5m]))",
+          "legendFormat": "{{application}} {{status}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Erros HTTP (4xx/5xx)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "kafka_consumer_fetch_manager_records_lag_max{application=~\"tc-fiapx-.*\"}",
+          "legendFormat": "lag {{application}} {{topic}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Lag dos consumidores Kafka",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes", "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (application) (jvm_memory_used_bytes{application=~\"tc-fiapx-.*\", area=\"heap\"})",
+          "legendFormat": "{{application}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Memoria heap JVM",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (application, state) (jvm_threads_states_threads{application=~\"tc-fiapx-.*\"})",
+          "legendFormat": "{{application}} {{state}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Threads JVM por estado",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["fiapx", "fase-5"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "FIAP X - Visao geral",
+  "uid": "fiapx-overview",
+  "version": 1,
+  "weekStart": ""
+}
