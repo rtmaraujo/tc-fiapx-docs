@@ -1,0 +1,49 @@
+C4Deployment
+  title FIAP X - Diagrama de Implantacao
+
+  Deployment_Node(dev, "Ambiente local", "Docker Compose") {
+    Deployment_Node(devNet, "Rede fiapx") {
+      Container(authLocal, "auth-service", "Java 21", "8081")
+      Container(videoLocal, "video-service", "Java 21", "8082")
+      Container(procLocal, "processing-service", "Java 21 + FFmpeg", "8083")
+      ContainerDb(pgLocal, "PostgreSQL 16", "Container", "3 bancos")
+      ContainerQueue(kafkaLocal, "Kafka 3.9 KRaft", "Container", "9092/9094")
+      ContainerDb(storageLocal, "SeaweedFS", "Container", "S3 8333 / Filer 8888")
+      Container(mailLocal, "MailHog", "Container", "1025/8025")
+      Container(obsLocal, "Prometheus + Grafana + Zipkin", "Containers", "9090/3000/9411")
+    }
+  }
+
+  Deployment_Node(aws, "AWS Academy / k3s", "Cluster Kubernetes") {
+    Deployment_Node(ns, "Namespace fiapx") {
+      Deployment_Node(authPod, "Deployment auth-service", "2..6 replicas + HPA") {
+        Container(authPodC, "Pod auth-service", "Imagem Docker", "8081")
+      }
+      Deployment_Node(videoPod, "Deployment video-service", "2..8 replicas + HPA") {
+        Container(videoPodC, "Pod video-service", "Imagem Docker", "8082")
+      }
+      Deployment_Node(procPod, "Deployment processing-service", "2..10 replicas + HPA") {
+        Container(procPodC, "Pod processing-service", "Imagem com FFmpeg", "8083")
+      }
+      Container(ingress, "Traefik IngressRoute", "Kubernetes", "/api/auth e /api/videos")
+      Container(svc, "Services ClusterIP", "Kubernetes", "Descoberta interna")
+    }
+    Deployment_Node(infra, "Infraestrutura de apoio", "Gerenciada ou no cluster") {
+      ContainerDb(pg, "PostgreSQL", "RDS/StatefulSet", "3 bancos")
+      ContainerQueue(kafka, "Apache Kafka", "StatefulSet/MSK", "Topicos FIAP X")
+      ContainerDb(s3, "Object storage S3", "StatefulSet ou servico gerenciado", "Bucket fiapx-videos")
+      Container(obs, "Observabilidade", "Prometheus/Grafana/Zipkin", "Metricas e traces")
+    }
+  }
+
+  Rel(ingress, svc, "Encaminha trafego")
+  Rel(svc, authPodC, "8081")
+  Rel(svc, videoPodC, "8082")
+  Rel(svc, procPodC, "8083")
+  Rel(authPodC, pg, "JDBC")
+  Rel(videoPodC, pg, "JDBC")
+  Rel(procPodC, pg, "JDBC")
+  Rel(videoPodC, kafka, "Publica/consome")
+  Rel(procPodC, kafka, "Consome/publica")
+  Rel(videoPodC, s3, "S3")
+  Rel(procPodC, s3, "S3")

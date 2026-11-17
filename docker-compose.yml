@@ -1,0 +1,251 @@
+name: fiapx
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fiapx-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  kafka:
+    image: apache/kafka:3.9.1
+    container_name: fiapx-kafka
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:9094,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 24
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  kafka-init:
+    image: apache/kafka:3.9.1
+    container_name: fiapx-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        for topico in fiapx.video.solicitado fiapx.video.processado fiapx.video.falha; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 \
+            --create --if-not-exists --topic "$$topico" --partitions 3 --replication-factor 1
+        done
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+    restart: "no"
+
+  storage:
+    image: chrislusf/seaweedfs:latest
+    container_name: fiapx-storage
+    command: server -dir=/data -s3 -s3.port=8333
+    ports:
+      - "8333:8333"
+      - "8888:8888"
+      - "9333:9333"
+    volumes:
+      - storage_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9333/cluster/healthz >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+    restart: unless-stopped
+
+  storage-init:
+    image: amazon/aws-cli:latest
+    container_name: fiapx-storage-init
+    depends_on:
+      storage:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: fiapx
+      AWS_SECRET_ACCESS_KEY: fiapx12345
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        aws --endpoint-url http://storage:8333 s3 mb s3://fiapx-videos || true
+        aws --endpoint-url http://storage:8333 s3 ls
+    restart: "no"
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: fiapx-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
+
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: fiapx-zipkin
+    ports:
+      - "9411:9411"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: fiapx-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: fiapx-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: fiapx12345
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./tc-fiapx-auth-service
+    container_name: fiapx-auth-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
+    ports:
+      - "8081:8081"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/fiapx_auth
+      DB_USER: fiapx_auth_user
+      DB_PASSWORD: fiapx_auth_pass
+      JWT_SECRET: fiapx-prod-secret-key-with-at-least-32-bytes
+      JWT_ISSUER: fiapx-auth
+      JWT_EXPIRATION: PT2H
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  video-service:
+    build:
+      context: ./tc-fiapx-video-service
+    container_name: fiapx-video-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+      mailhog:
+        condition: service_started
+      auth-service:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/fiapx_video
+      DB_USER: fiapx_video_user
+      DB_PASSWORD: fiapx_video_pass
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      STORAGE_ENDPOINT: http://storage:8333
+      STORAGE_ACCESS_KEY: fiapx
+      STORAGE_SECRET_KEY: fiapx12345
+      STORAGE_BUCKET: fiapx-videos
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      JWT_SECRET: fiapx-prod-secret-key-with-at-least-32-bytes
+      JWT_ISSUER: fiapx-auth
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  processing-service:
+    build:
+      context: ./tc-fiapx-processing-service
+    container_name: fiapx-processing-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+    ports:
+      - "8083:8083"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/fiapx_processing
+      DB_USER: fiapx_processing_user
+      DB_PASSWORD: fiapx_processing_pass
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      STORAGE_ENDPOINT: http://storage:8333
+      STORAGE_ACCESS_KEY: fiapx
+      STORAGE_SECRET_KEY: fiapx12345
+      STORAGE_BUCKET: fiapx-videos
+      FFMPEG_BINARY: ffmpeg
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  storage_data:
+  prometheus_data:
+  grafana_data:

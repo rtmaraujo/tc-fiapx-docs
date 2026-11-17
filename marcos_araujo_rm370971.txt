@@ -1,0 +1,21 @@
+Nome do grupo: Commit Sem Volta
+
+Participantes e usernames no Discord:
+Marcos da Paz Araujo - RM370971 - _marcosaraujo
+
+Link da documentação (DDD): 
+https://miro.com/app/board/uXjVGvCXiZA=/?share_link_id=560189728381
+
+Link do repositórios:
+https://github.com/rtmaraujo/tc-oficina-app
+https://github.com/rtmaraujo/tc-oficina-lambda
+https://github.com/rtmaraujo/tc-oficina-infra-k8s
+https://github.com/rtmaraujo/tc-oficina-infra-db
+
+Desenhos de arquitetura: disponíveis no README do repositório principal (tc-oficina-app), na seção Arquitetura (https://github.com/rtmaraujo/tc-oficina-app#arquitetura), com diagramas da visão geral (C4-style) e visão de deployment (Docker Compose dev + Kubernetes/Traefik em produção).
+
+Relatório com análise de vulnerabilidades encontradas no sistema: 
+adicionado com evidências no arquivo relatorio_vulnerabilidade.md no repositório do projeto. 
+
+Video de Demonstração:
+https://youtu.be/3FjX97UViJs

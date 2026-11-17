@@ -1,0 +1,204 @@
+{
+  "info": {
+    "name": "FIAP X - Fase 5",
+    "description": "Fluxo completo: cadastro, login, upload, status e download dos frames.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "authUrl", "value": "http://localhost:8081" },
+    { "key": "videoUrl", "value": "http://localhost:8082" },
+    { "key": "token", "value": "" },
+    { "key": "videoId", "value": "" },
+    { "key": "nome", "value": "Maria" },
+    { "key": "email", "value": "maria@fiapx.com" },
+    { "key": "senha", "value": "senha1234" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Registrar usuario",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"{{nome}}\",\n  \"email\": \"{{email}}\",\n  \"senha\": \"{{senha}}\"\n}"
+            },
+            "url": { "raw": "{{authUrl}}/api/auth/register", "host": ["{{authUrl}}"], "path": ["api", "auth", "register"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+                  "pm.test('usuario ativo', function () { pm.expect(pm.response.json().ativo).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"senha\": \"{{senha}}\"\n}"
+            },
+            "url": { "raw": "{{authUrl}}/api/auth/login", "host": ["{{authUrl}}"], "path": ["api", "auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.expect(body.accessToken).to.be.a('string');",
+                  "pm.collectionVariables.set('token', body.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Usuario autenticado",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{authUrl}}/api/auth/me", "host": ["{{authUrl}}"], "path": ["api", "auth", "me"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('200 OK', function () { pm.response.to.have.status(200); });"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Videos",
+      "item": [
+        {
+          "name": "Upload de video",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "arquivo", "type": "file", "src": "video.mp4", "description": "Selecione um arquivo de video local" }
+              ]
+            },
+            "url": { "raw": "{{videoUrl}}/api/videos", "host": ["{{videoUrl}}"], "path": ["api", "videos"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202 Accepted', function () { pm.response.to.have.status(202); });",
+                  "var body = pm.response.json();",
+                  "pm.expect(body.status).to.eql('PENDENTE');",
+                  "pm.collectionVariables.set('videoId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar videos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{videoUrl}}/api/videos?pagina=0&tamanho=20",
+              "host": ["{{videoUrl}}"],
+              "path": ["api", "videos"],
+              "query": [
+                { "key": "pagina", "value": "0" },
+                { "key": "tamanho", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('200 OK', function () { pm.response.to.have.status(200); });"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar videos com falha",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{videoUrl}}/api/videos?status=ERRO",
+              "host": ["{{videoUrl}}"],
+              "path": ["api", "videos"],
+              "query": [{ "key": "status", "value": "ERRO" }]
+            }
+          }
+        },
+        {
+          "name": "Consultar status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{videoUrl}}/api/videos/{{videoId}}",
+              "host": ["{{videoUrl}}"],
+              "path": ["api", "videos", "{{videoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "console.log('status atual:', pm.response.json().status);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Baixar ZIP dos frames",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{videoUrl}}/api/videos/{{videoId}}/download",
+              "host": ["{{videoUrl}}"],
+              "path": ["api", "videos", "{{videoId}}", "download"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "pm.test('content-type zip', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/zip');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

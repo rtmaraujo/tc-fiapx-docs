@@ -1,0 +1,30 @@
+C4Component
+  title processing-service - Diagrama de Componentes
+
+  Container_Boundary(processing, "processing-service") {
+    Component(consumer, "VideoSolicitadoConsumer", "Spring Kafka", "Consome fiapx.video.solicitado com idempotencia por eventId.")
+    Component(app, "ProcessamentoApplicationServiceImpl", "Application Service", "Baixa video, extrai frames, gera ZIP, salva e publica resultado.")
+    Component(domain, "Processamento", "Domain", "Agregado com estados RECEBIDO, PROCESSANDO, CONCLUIDO e FALHA.")
+    Component(extractor, "FfmpegFrameExtractor", "Adapter FFmpeg", "Executa ffmpeg com fps=1 e valida os frames gerados.")
+    Component(runner, "DefaultProcessRunner", "Infra", "Executa processo externo com timeout e captura de log.")
+    Component(zip, "ZipService", "Infra", "Empacota os frames em um unico ZIP.")
+    Component(storage, "MinioStorageAdapter", "Adapter S3", "Baixa o original e salva o ZIP.")
+    Component(publisher, "KafkaEventoPublisher", "Adapter Kafka", "Publica VideoProcessado e VideoFalha.")
+    Component(dlt, "KafkaErrorHandlerConfig", "Spring Kafka", "Retry com backoff fixo e envio para .DLT.")
+  }
+
+  ContainerDb(db, "PostgreSQL", "fiapx_processing", "processamento e evento_processado.")
+  ContainerQueue(kafka, "Kafka", "Mensageria", "Topico de solicitacao e topicos de resultado.")
+  ContainerDb(s3, "SeaweedFS (S3)", "Object storage", "Bucket fiapx-videos.")
+
+  Rel(kafka, consumer, "Entrega VideoSolicitado")
+  Rel(consumer, app, "Processa evento novo")
+  Rel(app, domain, "Aplica transicoes")
+  Rel(app, storage, "Baixa original e salva ZIP")
+  Rel(app, extractor, "Extrai frames")
+  Rel(extractor, runner, "Executa ffmpeg")
+  Rel(app, zip, "Compacta frames")
+  Rel(app, publisher, "Publica resultado")
+  Rel(publisher, kafka, "VideoProcessado / VideoFalha")
+  Rel(app, db, "Persiste processamento", "JDBC")
+  Rel(storage, s3, "S3 API")
