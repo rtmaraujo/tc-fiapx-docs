@@ -15,5 +15,9 @@ target/
 # Lixo de pacote macOS
 __MACOSX/
 
+# Artefatos locais de deploy (kubeconfig, chaves, clones temporarios)
+.deploy/
+*.pem
+
 # Pacote original recebido (o conteudo esta em legacy/projeto-fiapx)
 projeto-fiapx.zip

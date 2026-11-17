@@ -1,0 +1,139 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-data
+  namespace: fiapx
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: fiapx
+  labels:
+    app: kafka
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: apache/kafka:3.9.1
+          ports:
+            - containerPort: 9092
+            - containerPort: 9093
+          env:
+            - name: KAFKA_NODE_ID
+              value: "1"
+            - name: KAFKA_PROCESS_ROLES
+              value: broker,controller
+            - name: KAFKA_LISTENERS
+              value: PLAINTEXT://:9092,CONTROLLER://:9093
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: PLAINTEXT://kafka.fiapx.svc.cluster.local:9092
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: CONTROLLER
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: 1@localhost:9093
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1"
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0"
+            - name: KAFKA_NUM_PARTITIONS
+              value: "3"
+            - name: KAFKA_LOG_DIRS
+              value: /var/lib/kafka/data
+            - name: KAFKA_HEAP_OPTS
+              value: -Xms512m -Xmx1g
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "250m"
+            limits:
+              memory: "1.5Gi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: kafka-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: fiapx
+  labels:
+    app: kafka
+spec:
+  selector:
+    app: kafka
+  ports:
+    - name: broker
+      port: 9092
+      targetPort: 9092
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-init
+  namespace: fiapx
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app: kafka-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: kafka-init
+          image: apache/kafka:3.9.1
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              for topico in fiapx.video.solicitado fiapx.video.processado fiapx.video.falha; do
+                /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 \
+                  --create --if-not-exists --topic "$topico" --partitions 3 --replication-factor 1
+              done
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
