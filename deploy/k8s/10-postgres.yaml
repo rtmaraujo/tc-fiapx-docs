@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: fiapx
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: fiapx
+data:
+  01-create-databases.sql: |
+    -- Um banco por servico (database-per-service).
+    CREATE USER fiapx_auth_user WITH PASSWORD 'fiapx_auth_pass';
+    CREATE DATABASE fiapx_auth OWNER fiapx_auth_user;
+
+    CREATE USER fiapx_video_user WITH PASSWORD 'fiapx_video_pass';
+    CREATE DATABASE fiapx_video OWNER fiapx_video_user;
+
+    CREATE USER fiapx_processing_user WITH PASSWORD 'fiapx_processing_pass';
+    CREATE DATABASE fiapx_processing OWNER fiapx_processing_user;
+
+    GRANT ALL PRIVILEGES ON DATABASE fiapx_auth TO fiapx_auth_user;
+    GRANT ALL PRIVILEGES ON DATABASE fiapx_video TO fiapx_video_user;
+    GRANT ALL PRIVILEGES ON DATABASE fiapx_processing TO fiapx_processing_user;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: fiapx
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+        - name: init
+          configMap:
+            name: postgres-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: fiapx
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

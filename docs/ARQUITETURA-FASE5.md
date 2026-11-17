@@ -388,29 +388,32 @@ Cada repositorio tem `.github/workflows/ci.yml` com:
 3. SonarCloud quando `SONAR_TOKEN` estiver configurado.
 4. Publicacao do relatorio JaCoCo.
 5. Build da imagem Docker.
+6. Publicacao da imagem no GHCR (`ghcr.io/rtmaraujo/tc-fiapx-*`), na `main` ou via `workflow_dispatch`.
 
-O deploy no k3s da AWS Academy sera habilitado quando as credenciais e o cluster estiverem disponiveis. Os manifests em `k8s/` ja incluem Deployment, Service, HPA, ConfigMap, Secret de exemplo e IngressRoute (Traefik).
+O deploy no k3s da AWS Academy e feito pelos scripts em `deploy/` (instancia EC2 com k3s, manifests de infraestrutura e aplicacao da stack). Os manifests em `k8s/` de cada servico incluem Deployment, Service, HPA, ConfigMap, Secret de exemplo e IngressRoute (Traefik).
 
 ## 17. Deploy no Kubernetes
 
-```bash
-kubectl apply -f tc-fiapx-auth-service/k8s/namespace.yaml
-kubectl apply -f tc-fiapx-auth-service/k8s/configmap.yaml
-kubectl apply -f tc-fiapx-auth-service/k8s/secret.example.yaml   # ajuste os valores
-kubectl apply -f tc-fiapx-auth-service/k8s/deployment.yaml
-kubectl apply -f tc-fiapx-auth-service/k8s/service.yaml
-kubectl apply -f tc-fiapx-auth-service/k8s/hpa.yaml
-kubectl apply -f tc-fiapx-auth-service/k8s/ingressroute.yaml
+Ambiente local (Docker Compose) e o caminho padrao de demonstracao. Para o cluster k3s na AWS Academy:
+
+```powershell
+$env:AWS_DEFAULT_REGION = 'us-west-2'
+powershell -ExecutionPolicy Bypass -File .\deploy\aws\bootstrap.ps1
+
+$env:KUBECONFIG="$HOME\.kube\fiapx-k3s.yaml"
+powershell -ExecutionPolicy Bypass -File .\deploy\deploy.ps1 -PublicIp <ip-publico>
 ```
 
-Repita para `video-service` e `processing-service`. O namespace e compartilhado (`fiapx`); os ConfigMaps e Secrets sao por servico.
+O `bootstrap.ps1` cria a chave SSH, o security group e a instancia `t3.large` com k3s. O `deploy.ps1` cria os secrets, aplica a infraestrutura (`deploy/k8s`) e os tres servicos, aguardando os jobs de inicializacao (bancos, topicos e bucket).
 
-Dependencias de infraestrutura no cluster:
+Validacao no cluster (17/11/2026): 12 pods em `Running`, smoke test E2E com ZIP de 6 frames, caminho de falha com e-mail no MailHog, Prometheus com 4 targets `up` e os 3 servicos no Zipkin. Para derrubar os recursos: `deploy/aws/teardown.ps1`.
+
+Dependencias de infraestrutura no cluster, ja provisionadas pelos manifests de `deploy/k8s`:
 
 - PostgreSQL com os tres bancos (`infra/postgres/init`).
 - Kafka com os tres topicos (3 particoes cada).
-- Object storage S3-compativel com o bucket `fiapx-videos` (SeaweedFS no Compose, S3 em producao).
-- Prometheus/Grafana/Zipkin (opcional no cluster; pode usar servicos gerenciados).
+- Object storage S3-compativel com o bucket `fiapx-videos` (SeaweedFS no Compose e no cluster).
+- MailHog, Zipkin, Prometheus e Grafana.
 
 ## 18. Estrutura dos repositorios
 
@@ -435,13 +438,14 @@ tc-fiapx-docs/
   docs/postman/*
   docs/ROTEIRO-VIDEO.md
   infra/{postgres,prometheus,grafana,kafka}
-  scripts/{smoke-test.sh,smoke-test.ps1}
+  deploy/{aws,k8s}
+  scripts/{smoke-test.sh,smoke-test.ps1,publicar-github.ps1}
   docker-compose.yml
 ```
 
 ## 19. Limitacoes e proximos passos
 
-- Deploy na AWS Academy pendente de credenciais validas e cluster ativo.
+- O cluster da AWS Academy usa credenciais temporarias: ao encerrar a sessao do laboratorio, a instancia e os dados deixam de existir.
 - Sem interface web por decisao de escopo: a validacao e feita via Postman/Swagger.
 - Possivel evolucao: refresh token, rate limiting no upload, antivirus, notificacao de sucesso por e-mail, metricas de negocio (videos processados/falhos) e DLQ monitorada.
 - Para producao real, usar PostgreSQL gerenciado, Kafka gerenciado (MSK), S3 e SMTP autenticado com TLS.

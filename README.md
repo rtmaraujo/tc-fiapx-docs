@@ -102,8 +102,9 @@ fase-5/
 
 - Servicos implementados e validados localmente (189 testes no total).
 - Infra local via Docker Compose pronta.
-- Manifests Kubernetes e workflows de CI prontos.
-- Deploy na AWS Academy pendente de credenciais e cluster ativos.
+- Manifests Kubernetes, imagens no GHCR e deploy em k3s (AWS Academy) automatizados em `deploy/`.
+- Pipelines de CI em todos os repositorios; `main` protegida e alteracoes somente via pull request.
+- Deploy ativo enquanto durar a sessao do AWS Academy (credenciais temporarias).
 
 ## Publicacao no GitHub
 
