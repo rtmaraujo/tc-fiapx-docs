@@ -25,7 +25,7 @@ A Fase 5 substitui a implementacao monolitica em Go por **tres microsservicos Ja
 | Arquitetura escalavel | Servicos stateless, Kafka, object storage, HPA e Virtual Threads |
 | Versionamento no GitHub | Quatro repositorios: tres servicos + documentacao/infra |
 | Testes automatizados | 37 testes (auth) + 104 (video) + 48 (processing), JaCoCo >= 85% |
-| CI/CD | GitHub Actions com build, testes, cobertura, SonarCloud e build da imagem |
+| CI/CD | GitHub Actions com build, testes, cobertura (JaCoCo), SpotBugs, CodeQL, Dependabot e build da imagem |
 | Docker e Kubernetes | Dockerfiles multi-stage, Docker Compose completo e manifests k8s |
 | Kafka/RabbitMQ | Apache Kafka em modo KRaft |
 | PostgreSQL + cache/alternativa | PostgreSQL + object storage S3-compativel (SeaweedFS local, S3 em producao) |
@@ -377,18 +377,19 @@ cd tc-fiapx-processing-service && mvn -B verify
 
 Os testes de integracao usam H2 em modo PostgreSQL, storage/email/extrator/publisher fake e Kafka desabilitado. Os testes do `DefaultProcessRunner` executam processos Java reais para validar timeout e truncamento de log.
 
-Analise estatica: SonarCloud configurado no POM (`sonar.projectKey`, `sonar.coverage.jacoco.xmlReportPaths`) e no workflow.
+Analise estatica: SpotBugs (`effort=Max`, falha em bugs de prioridade alta) roda no `mvn -B clean verify` dos tres servicos, e o CodeQL (`security-extended`) analisa o codigo em PR, na `main` e semanalmente, publicando os alertas em *Security > Code scanning*. As dependencias sao monitoradas pelo Dependabot.
 
 ## 16. CI/CD
 
 Cada repositorio tem `.github/workflows/ci.yml` com:
 
 1. Checkout e JDK 21 (Temurin) com cache Maven.
-2. `mvn -B clean verify` (testes + JaCoCo 85%).
-3. SonarCloud quando `SONAR_TOKEN` estiver configurado.
-4. Publicacao do relatorio JaCoCo.
-5. Build da imagem Docker.
-6. Publicacao da imagem no GHCR (`ghcr.io/rtmaraujo/tc-fiapx-*`), na `main` ou via `workflow_dispatch`.
+2. `mvn -B clean verify`: testes, cobertura minima de 85% (JaCoCo) e SpotBugs.
+3. Publicacao dos relatorios JaCoCo e SpotBugs como artefatos.
+4. Build da imagem Docker.
+5. Publicacao da imagem no GHCR (`ghcr.io/rtmaraujo/tc-fiapx-*`), na `main` ou via `workflow_dispatch`.
+
+Alem do `ci.yml`, cada servico tem o workflow `codeql.yml` (analise de seguranca) e o `.github/dependabot.yml` (atualizacao semanal de dependencias Maven e mensal das actions). Nenhuma das duas exige token: o CodeQL usa o `GITHUB_TOKEN`.
 
 O deploy no k3s da AWS Academy e feito pelos scripts em `deploy/` (instancia EC2 com k3s, manifests de infraestrutura e aplicacao da stack). Os manifests em `k8s/` de cada servico incluem Deployment, Service, HPA, ConfigMap, Secret de exemplo e IngressRoute (Traefik).
 
