@@ -406,6 +406,8 @@ powershell -ExecutionPolicy Bypass -File .\deploy\deploy.ps1 -PublicIp <ip-publi
 
 O `bootstrap.ps1` cria a chave SSH, o security group e a instancia `t3.large` com k3s. O `deploy.ps1` cria os secrets, aplica a infraestrutura (`deploy/k8s`) e os tres servicos, aguardando os jobs de inicializacao (bancos, topicos e bucket).
 
+Validacao no cluster (17/11/2026): 12 pods em `Running`, smoke test E2E com ZIP de 6 frames, caminho de falha com e-mail no MailHog, Prometheus com 4 targets `up` e os 3 servicos no Zipkin. Para derrubar os recursos: `deploy/aws/teardown.ps1`.
+
 Dependencias de infraestrutura no cluster, ja provisionadas pelos manifests de `deploy/k8s`:
 
 - PostgreSQL com os tres bancos (`infra/postgres/init`).

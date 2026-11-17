@@ -89,7 +89,7 @@ else {
         '--security-group-ids', $sgId,
         '--count', '1',
         '--user-data', $userDataUri,
-        '--block-device-mappings', "[{`"DeviceName`":`"/dev/sda1`",`"Ebs`":{`"VolumeSize`":$VolumeGb,`"VolumeType`":`"gp3`",`"DeleteOnTermination`":true}}]",
+        '--block-device-mappings', "DeviceName=/dev/sda1,Ebs={VolumeSize=$VolumeGb,VolumeType=gp3,DeleteOnTermination=true}",
         '--tag-specifications', "ResourceType=instance,Tags=[{Key=Name,Value=$Name}]",
         '--query', 'Instances[0].InstanceId', '--output', 'text'
     )
@@ -118,7 +118,7 @@ Write-Host '==> baixando kubeconfig'
 $dirKube = Split-Path $KubeConfigPath -Parent
 if (-not (Test-Path $dirKube)) { New-Item -ItemType Directory -Path $dirKube -Force | Out-Null }
 $temp = Join-Path $env:TEMP 'k3s.yaml'
-& scp @sshOptions -i $KeyPath "ubuntu@$ip:/etc/rancher/k3s/k3s.yaml" $temp | Out-Null
+& scp @sshOptions -i $KeyPath "ubuntu@${ip}:/etc/rancher/k3s/k3s.yaml" $temp | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'falha ao copiar o kubeconfig' }
 $conteudo = (Get-Content $temp -Raw) -replace 'https://127\.0\.0\.1:6443', "https://${ip}:6443"
 [System.IO.File]::WriteAllText($KubeConfigPath, $conteudo)

@@ -59,3 +59,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1 `
   Em producao, restrinja o `SshCidr` no `bootstrap.ps1`.
 - Nada de credencial vai para o Git: secrets sao criados em runtime e o kubeconfig fica
   fora do repositorio (`.deploy/` e `*.pem` ignorados).
+- Os servicos usam request de CPU baixo (100m) para caber nas duas replicas de cada um
+  em um no unico de 2 vCPU; os limites continuam altos para absorver picos.
+- A AWS Academy exige IMDSv2; o cloud-init obtem o IP publico com token.
+
+## 4. Derrubar os recursos
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\aws\teardown.ps1
+```
+
+Encerra a instancia, remove o security group e a key pair (a chave local em `~/.ssh` e mantida).
+
+## Validacao realizada (17/11/2026)
+
+- Cluster k3s `v1.37.2` com 12 pods em `Running` e 2 jobs `Completed`.
+- Smoke test E2E: upload, processamento em ~2 s, status `CONCLUIDO` e ZIP com 6 frames.
+- Caminho de falha: status `ERRO` e e-mail entregue no MailHog.
+- Prometheus com 4 targets `up`, Zipkin com os 3 servicos e Grafana 11.4.0 provisionado.

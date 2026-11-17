@@ -18,7 +18,7 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
-$raiz = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$raiz = Split-Path $PSScriptRoot -Parent
 if (-not $AppsRoot) { $AppsRoot = $raiz }
 $k8s = Join-Path $PSScriptRoot 'k8s'
 $namespace = 'fiapx'
