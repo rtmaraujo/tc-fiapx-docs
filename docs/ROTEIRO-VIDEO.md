@@ -99,7 +99,7 @@ cd ../tc-fiapx-processing-service && mvn -B verify
 
 Mostrar o resumo: **37 + 104 + 48 testes**, todos verdes, e a mensagem `All coverage checks have been met` (85% de linhas e branches).
 
-Mostrar o workflow `.github/workflows/ci.yml`: build, testes, SonarCloud, artefato JaCoCo e build da imagem Docker.
+Mostrar o workflow `.github/workflows/ci.yml`: build, testes, JaCoCo 85%, SpotBugs e build da imagem Docker; e o `codeql.yml` com a analise de seguranca no GitHub.
 
 ## 9:00 - 10:00 | Kubernetes e CI/CD
 
